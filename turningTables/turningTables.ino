@@ -7,6 +7,7 @@ const int gearRatioConst = 5;
 // variables will change:
 int hallState = 0;          // variable for reading the hall sensor status
 int gearTurns = 0; //variable for how many times the gear with the magnet has spun
+int currentTrack = 0;
 
 void setup() {
   // initialize the LED pin as an output:
@@ -60,3 +61,16 @@ void rotate(boolean clockwiseOrNot, int distance) {
     Serial.println("DONE");
   }
 }
+
+//direct is a weird argument. 1 means clockwise, 2 is counterclockwise
+void goToTrack(int trknumber, int direct) {
+  if (direct == 1) {
+    //clockwise
+    
+  }
+  else if (direct == 2) {
+    //counterclockwise
+    
+  }
+}
+
