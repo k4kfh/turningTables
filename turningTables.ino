@@ -19,7 +19,7 @@ void setup() {
 }
 
 void loop(){
-  rotate(true, 3);
+  
 }
 
 void rpmRead() {
@@ -74,3 +74,35 @@ void goToTrack(int trknumber, int direct) {
   }
 }
 
+
+/*
+chooseDirection()
+
+Using some borrowed code from StackExchange, I built this function that determines the quickest direction to get where we need to go.
+*/
+int chooseDirection(int currentPosition, int goingTo, int maxPosition) {
+  int directionToGo; //this will be defined later, just go ahead and declare it
+  int specialNum = maxPosition / 2;
+  if(currentPosition < goingTo) {
+    if(abs(currentPosition - goingTo) < specialNum) {
+       //CLOCKWISE
+       directionToGo = 0;
+    }
+    else {
+        //COUNTERCLOCKWISE
+        directionToGo = 1;
+    }
+  }
+
+  else {
+    if(abs(currentPosition - goingTo) < specialNum) {
+       //COUNTERCLOCKWISE
+       directionToGo = 1;
+    }
+    else {
+        //CLOCKWISE
+        directionToGo = 0;
+    }
+  }
+  return directionToGo;
+ }
