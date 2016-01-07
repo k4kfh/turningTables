@@ -2,6 +2,7 @@
 const int hallPin = 2;     // the number of the hall effect sensor pin
 const int motorPin =  13;     // the number of the LED pin
 const int gearRatioConst = 5;
+const int numTracks = 20;
 
 
 // variables will change:
@@ -16,10 +17,12 @@ void setup() {
   pinMode(hallPin, INPUT);
   attachInterrupt(digitalPinToInterrupt(hallPin), rpmRead, FALLING);
   Serial.begin(9600);
+  pinMode(6, OUTPUT);
+  pinMode(7, OUTPUT);
 }
 
 void loop(){
-  
+  goToTrack(15, 0);
 }
 
 void rpmRead() {
@@ -32,8 +35,11 @@ void clockwise() {
   while (gearTurns != gearRatioConst) {
     Serial.print("Rotating >>>... Gear Turns = ");
     Serial.println(gearTurns);
+    digitalWrite(6, HIGH);
   }
   Serial.println("FINISHED ONE TRACK MOVE");
+  digitalWrite(7, LOW);
+  digitalWrite(6, LOW);
 }
 
 void counterclockwise() {
@@ -41,12 +47,15 @@ void counterclockwise() {
   while (gearTurns != gearRatioConst) {
     Serial.print("Rotating <<<... Gear Turns = ");
     Serial.println(gearTurns);
+    digitalWrite(7, HIGH);
   }
   Serial.println("FINISHED ONE TRACK MOVE");
+  digitalWrite(7, LOW);
+  digitalWrite(6, LOW);
 }
 
-void rotate(boolean clockwiseOrNot, int distance) {
-  if (clockwiseOrNot == true) {
+void rotate(int directionToGo, int distance) {
+  if (directionToGo == 0) {
     //clockwise rotation
     for (int rotations = 0; rotations < distance; rotations++) {
       clockwise();
@@ -54,7 +63,7 @@ void rotate(boolean clockwiseOrNot, int distance) {
     Serial.println("DONE");
     
   }
-  if (clockwiseOrNot == false) {
+  if (directionToGo == 1) {
     for (int rotations = 0; rotations < distance; rotations++) {
       counterclockwise();
     }
@@ -64,13 +73,18 @@ void rotate(boolean clockwiseOrNot, int distance) {
 
 //direct is a weird argument. 1 means clockwise, 2 is counterclockwise
 void goToTrack(int trknumber, int direct) {
-  if (direct == 1) {
-    //clockwise
-    
+  if (direct == -1) {
+    //auto choose direction
+    int actualdirect = chooseDirection(currentTrack, trknumber, numTracks);
   }
-  else if (direct == 2) {
+  int moves; //declared here for proper scope crap
+  if (actualdirect == 0) {
+    //clockwise
+    moves = trknumber - currentTrack;
+  }
+  else if (actualdirect == 1) {
     //counterclockwise
-    
+    moves = (currentTrack + ( (numTracks + 1) - trknumber)); //this elegant math gives the number of counterclockwise track moves we have to make to get to a given track
   }
 }
 
