@@ -1,128 +1,163 @@
-#include <CMRI.h>
+#define num_tracks 24
+#define motor_cw_pin 10
+#define motor_ccw_pin 11
+#define hall_pin 2 //make sure this pin is interrupt-capable
+const int turnsPerRotation = 5; //this is 5 on Atlas turntable
+#define normal_motor_speed 255 //this is the PWM number the motor will turn at, if on a PWM-capable pin
 
-// constants won't change. They're used here to set pin numbers:
-const int hallPin = 2;     // the number of the hall effect sensor pin
-const int motorPin =  13;     // the number of the LED pin
-const int gearRatioConst = 5;
-const int numTracks = 20;
+unsigned total_gearTurns = 0;
+int rotation_gearTurns = 0; //this will be between 1 and 5 always
+int currentPosition = 0;
 
+void setup() {
+  //set all the pins to the correct mode
+  pinMode(motor_cw_pin, OUTPUT);
+  pinMode(motor_ccw_pin, OUTPUT);
+  pinMode(hall_pin, INPUT);
 
-// variables will change:
-int hallState = 0;          // variable for reading the hall sensor status
-int gearTurns = 0; //variable for how many times the gear with the magnet has spun
-int currentTrack = 0;
+  //making hall effect sensor interrupt
+  attachInterrupt(digitalPinToInterrupt(hall_pin), hallTrigger, FALLING);
 
-void setup() { 
-  // initialize the hall effect sensor pin as an input:
-  pinMode(hallPin, INPUT);
-  attachInterrupt(digitalPinToInterrupt(hallPin), rpmRead, FALLING);
+  //start Serial connection
+  Serial.begin(9600);
 
-//motor shield pins
-  pinMode(3, OUTPUT);
-  pinMode(12, OUTPUT);
-  Serial.begin(9600, SERIAL_8N2);
+  
 }
 
-void loop(){
-  clockwise();
-  counterclockwise();
+void loop() {
+  // put your main code here, to run repeatedly:
+  rotate(12,0);
+  rotate(23,0);
+  rotate(24,0);
 }
 
-//This is a function executed (with attachInterrupt) every time the hall effect sensor goes from high to low
-void rpmRead() {
-  //This is executed every time the hall effect sensor goes from high to low
-  gearTurns++;
-}
+//simple function to run on hall effect sensor interrupt
+void hallTrigger() {
+  Serial.println("TRIGGER");
+  total_gearTurns++;
+  Serial.print("Total Gear Turns:"); Serial.println(total_gearTurns);
 
-void clockwise() {
-  gearTurns = 0;
-  while (gearTurns != gearRatioConst) {
-    digitalWrite(12, HIGH);
-    digitalWrite(3, HIGH);
-  }
-  digitalWrite(3, LOW);
-  digitalWrite(12, LOW);
-}
-
-//Called to turn the turntable 1 move counterclockwise.
-void counterclockwise() {
-  gearTurns = 0;
-  while (gearTurns != gearRatioConst) {
-    digitalWrite(3, HIGH);
-  }
-  digitalWrite(3, LOW);
-  digitalWrite(12, LOW);
-}
-
-void rotate(int directionToGo, int distance) {
-  if (directionToGo == 0) {
-    //clockwise rotation
-    for (int rotations = 0; rotations < distance; rotations++) {
-      clockwise();
-    }
-    
-  }
-  if (directionToGo == 1) {
-    for (int rotations = 0; rotations < distance; rotations++) {
-      counterclockwise();
-    }
-  }
-}
-
-//direct is a weird argument. 1 means clockwise, 2 is counterclockwise
-void goToTrack(int trknumber, int direct) {
-  int actualdirect;
-  if (direct == -1) {
-    //auto choose direction
-    actualdirect = chooseDirection(currentTrack, trknumber, numTracks);
+  //code to increment rotation_gearTurns
+  if (rotation_gearTurns < turnsPerRotation) {
+    rotation_gearTurns++;
   }
   else {
-    actualdirect = direct;
-  }
-  int moves; //declared here for proper scope crap
-  if (actualdirect == 0) {
-    //clockwise
-    moves = trknumber - currentTrack;
-  }
-  else if (actualdirect == 1) {
-    //counterclockwise
-    moves = (currentTrack + ( (numTracks + 1) - trknumber)); //this elegant math gives the number of counterclockwise track moves we have to make to get to a given track
+    rotation_gearTurns = 1; //at first glance it seems this should be zero. It shouldn't.
   }
 
-  rotate(actualdirect, moves);
+  Serial.print("Rotation Gear Turns:"); Serial.println(rotation_gearTurns);
+}
 
-  //set current track to new one
-  currentTrack = trknumber;
+void motor_cw() {
+  analogWrite(motor_cw_pin, normal_motor_speed);
+}
+
+void motor_ccw() {
+  analogWrite(motor_ccw_pin, normal_motor_speed);
+}
+
+void motor_stop() {
+  analogWrite(motor_ccw_pin, 0);
+  analogWrite(motor_cw_pin, 0);
+}
+
+//Turns the turntable clockwise by moves number of tracks
+void turn_cw(int moves) {
+  for (int i=0; i < moves; i++) {
+    //Turns the motor until the gear has rotated turnsPerRotation
+    while (rotation_gearTurns < turnsPerRotation) {
+      motor_cw();
+    }
+    rotation_gearTurns = 0; //this seems out of place, but it must be set otherwise the above WHILE loop can only run once
+  }
+  motor_stop();
+}
+
+//Turns the turntable counterclockwise by moves number of tracks
+void turn_ccw(int moves) {
+  for (int i=0; i < moves; i++) {
+    //Turns the motor until the gear has rotated turnsPerRotation
+    while (rotation_gearTurns < turnsPerRotation) {
+      motor_ccw();
+    }
+    rotation_gearTurns = 0; //this seems out of place, but it must be set otherwise the above WHILE loop can only run once
+  }
+  motor_stop();
 }
 
 
-/*
-chooseDirection()
+//Rotates the turntable to TRACK in MODE (mode can be 0, 1, 2, or 3, for auto-direction, clockwise, counterclockwise, or forced 180)
+void rotate(int track, int mode) {
+  int movesNeeded;
+  if (mode == 0) {
+    //automatic direction choice
+    int actualDirection = chooseDirection(currentPosition, track, num_tracks);
+    if (actualDirection == 1) {
+      if ((track - currentPosition) < 0) {
+        //if we cross over zero in order to get that
+        movesNeeded = (track + num_tracks) - currentPosition;
+        turn_cw(movesNeeded);
+      }
+      else {
+        //if we don't have to cross zero
+        movesNeeded = track - currentPosition;
+        turn_cw(movesNeeded);
+      }
+    }
+    else if (actualDirection == 2) {
+      //counterclockwise
+      if ((currentPosition - track) < 0) {
+        //if we cross over zero in order to get that
+        movesNeeded = (currentPosition + num_tracks) - track;
+        turn_ccw(movesNeeded);
+      }
+      else {
+        //if we don't have to cross zero
+        movesNeeded = currentPosition - track;
+        turn_ccw(movesNeeded);
+      }
+    }
+  }
+  if (mode == 1) {
+    //forced clockwise
+    
+  }
+  if (mode == 2) {
+    //forced counterclockwise
+    
+  }
+  if (mode == 3) {
+    //rotate 180
+    
+  }
+  Serial.print("Moves needed: "); Serial.println(movesNeeded);
+  currentPosition = track;
+}
 
-Using some borrowed code from StackExchange, I built this function that determines the quickest direction to get where we need to go.
-*/
+
+//Used by rotate()'s inner workings to figure out the most efficient direction to move in order to get to a certain track from our current position
 int chooseDirection(int currentPosition, int goingTo, int maxPosition) {
   int directionToGo; //this will be defined later, just go ahead and declare it
   int specialNum = maxPosition / 2;
   if(currentPosition < goingTo) {
     if(abs(currentPosition - goingTo) < specialNum) {
        //CLOCKWISE
-       directionToGo = 0;
+       directionToGo = 1;
     }
     else {
         //COUNTERCLOCKWISE
-        directionToGo = 1;
+        directionToGo = 2;
     }
   }
 
   else {
     if(abs(currentPosition - goingTo) < specialNum) {
        //COUNTERCLOCKWISE
-       directionToGo = 1;
+       directionToGo = 2;
     }
     else {
         //CLOCKWISE
-        directionToGo = 0;
+        directionToGo = 1;
     }
   }
   return directionToGo;
