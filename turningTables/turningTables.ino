@@ -1,3 +1,7 @@
+#include <CMRI.h>
+
+CMRI cmri;
+
 #define num_tracks 24
 #define motor_cw_pin 11
 #define motor_ccw_pin 10
@@ -28,7 +32,7 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(hall_pin), hallTrigger, FALLING);
 
   //start Serial connection
-  Serial.begin(9600);
+  Serial.begin(9600, SERIAL_8N2);
 
   //play startup noise
   startup_beep();
@@ -39,7 +43,7 @@ void setup() {
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
+  // Code for service alignment buttons
   buttonState_cw = digitalRead(service_btn_cw_pin);
   if (buttonState_cw != lastButtonState_cw) {
     if (buttonState_cw == LOW) {
@@ -55,7 +59,13 @@ void loop() {
     }
   }
   lastButtonState_ccw = buttonState_ccw;
-  
+
+  // 1: main processing node of cmri library
+  cmri.process();
+
+  if (cmri.get_byte(0) == HIGH) {
+    //haven't gotten anywhere on this yet
+  }
 }
 
 //simple function to run on hall effect sensor interrupt
