@@ -1,6 +1,9 @@
 #define num_tracks 24
-#define motor_cw_pin 10
-#define motor_ccw_pin 11
+#define motor_cw_pin 11
+#define motor_ccw_pin 10
+#define piezo_pin 9
+#define service_btn_cw_pin 3
+#define service_btn_ccw_pin 4
 #define hall_pin 2 //make sure this pin is interrupt-capable
 const int turnsPerRotation = 5; //this is 5 on Atlas turntable
 #define normal_motor_speed 255 //this is the PWM number the motor will turn at, if on a PWM-capable pin
@@ -8,12 +11,18 @@ const int turnsPerRotation = 5; //this is 5 on Atlas turntable
 unsigned total_gearTurns = 0;
 int rotation_gearTurns = 0; //this will be between 1 and 5 always
 int currentPosition = 0;
+int buttonState_cw = 0;
+int lastButtonState_cw = 0;
+int buttonState_ccw = 0;
+int lastButtonState_ccw = 0;
 
 void setup() {
   //set all the pins to the correct mode
   pinMode(motor_cw_pin, OUTPUT);
   pinMode(motor_ccw_pin, OUTPUT);
   pinMode(hall_pin, INPUT);
+  pinMode(service_btn_cw_pin, INPUT_PULLUP);
+  pinMode(service_btn_ccw_pin, INPUT_PULLUP);
 
   //making hall effect sensor interrupt
   attachInterrupt(digitalPinToInterrupt(hall_pin), hallTrigger, FALLING);
@@ -21,14 +30,32 @@ void setup() {
   //start Serial connection
   Serial.begin(9600);
 
-  
+  //play startup noise
+  startup_beep();
+
+  //test code
+  rotate(5,0);
+  prepToShutdown();
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
-  rotate(12,0);
-  rotate(23,0);
-  rotate(24,0);
+  buttonState_cw = digitalRead(service_btn_cw_pin);
+  if (buttonState_cw != lastButtonState_cw) {
+    if (buttonState_cw == LOW) {
+      click_cw();
+    }
+  }
+  lastButtonState_cw = buttonState_cw;
+
+  buttonState_ccw = digitalRead(service_btn_ccw_pin);
+  if (buttonState_ccw != lastButtonState_ccw) {
+    if (buttonState_ccw == LOW) {
+      click_ccw();
+    }
+  }
+  lastButtonState_ccw = buttonState_ccw;
+  
 }
 
 //simple function to run on hall effect sensor interrupt
@@ -49,16 +76,19 @@ void hallTrigger() {
 }
 
 void motor_cw() {
+  //Since I wanted to use the piezo speaker, I disabled the motor PWM.
   analogWrite(motor_cw_pin, normal_motor_speed);
+  //digitalWrite(motor_cw_pin, HIGH);
 }
 
 void motor_ccw() {
   analogWrite(motor_ccw_pin, normal_motor_speed);
+  //digitalWrite(motor_ccw_pin, HIGH);
 }
 
 void motor_stop() {
-  analogWrite(motor_ccw_pin, 0);
-  analogWrite(motor_cw_pin, 0);
+  digitalWrite(motor_ccw_pin, LOW);
+  digitalWrite(motor_cw_pin, LOW);
 }
 
 //Turns the turntable clockwise by moves number of tracks
@@ -162,4 +192,81 @@ int chooseDirection(int currentPosition, int goingTo, int maxPosition) {
   }
   return directionToGo;
  }
+
+ void prepToShutdown() {
+  tone(piezo_pin, 500);
+  delay(200);
+  noTone(piezo_pin);
+  delay(200);
+  tone(piezo_pin, 500);
+  delay(200);
+  noTone(piezo_pin);
+  delay(200);
+  tone(piezo_pin, 500);
+  delay(200);
+  noTone(piezo_pin);
+  delay(200);
+  rotate(0,0);
+  delay(2000);
+  tone(piezo_pin, 800);
+  delay(75);
+  tone(piezo_pin, 700);
+  delay(75);
+  tone(piezo_pin, 600);
+  delay(75);
+  tone(piezo_pin, 500);
+  delay(75);
+  tone(piezo_pin, 400);
+  delay(75);
+  tone(piezo_pin, 300);
+  delay(75);
+  tone(piezo_pin, 200);
+  delay(75);
+  tone(piezo_pin, 100);
+  delay(100);
+  noTone(piezo_pin);
+ }
+
+//calibration and debug functions
+void click_cw() {
+  for (int i=0; i < 1; i++) {
+    //Turns the motor until the gear has rotated turnsPerRotation
+    while (rotation_gearTurns < 1) {
+      motor_cw();
+    }
+    rotation_gearTurns = 0; //this seems out of place, but it must be set otherwise the above WHILE loop can only run once
+  }
+  motor_stop();
+}
+
+void click_ccw() {
+  for (int i=0; i < 1; i++) {
+    //Turns the motor until the gear has rotated turnsPerRotation
+    while (rotation_gearTurns < 1) {
+      motor_ccw();
+    }
+    rotation_gearTurns = 0; //this seems out of place, but it must be set otherwise the above WHILE loop can only run once
+  }
+  motor_stop();
+}
+
+void startup_beep() {
+  tone(piezo_pin, 100);
+  delay(75);
+  tone(piezo_pin, 200);
+  delay(75);
+  tone(piezo_pin, 300);
+  delay(75);
+  tone(piezo_pin, 400);
+  delay(75);
+  tone(piezo_pin, 500);
+  delay(75);
+  tone(piezo_pin, 600);
+  delay(75);
+  tone(piezo_pin, 700);
+  delay(75);
+  tone(piezo_pin, 800);
+  delay(100);
+  noTone(piezo_pin);
+}
 
