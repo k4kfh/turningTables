@@ -1,3 +1,12 @@
+/*
+turningTables | Model Railway Turntable Indexing System
+- Compatible with Atlas and other turntable brands
+- Interfaces with JMRI by posing as a C/MRI system
+- C/MRI Interface courtesy of ArduinoCMRI library
+- Controlled as a series of turnouts, like a Walthers or other comparable turntable
+Author: k4kfh
+Project Website: https://github.com/k4kfh/turningTables
+*/
 #define num_tracks 24
 #define motor_cw_pin 11
 #define motor_ccw_pin 10
@@ -39,7 +48,7 @@ void setup() {
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
+  //This code handles reading the alignment buttons. The buttons move the turntable not one track position, but one rotation of the measured gear, which is useful if the mechanism gets a few turns out of alignment.
   buttonState_cw = digitalRead(service_btn_cw_pin);
   if (buttonState_cw != lastButtonState_cw) {
     if (buttonState_cw == LOW) {
@@ -55,15 +64,13 @@ void loop() {
     }
   }
   lastButtonState_ccw = buttonState_ccw;
-  
+  //end button handling code
+  // C/MRI Interface Code
 }
 
 //simple function to run on hall effect sensor interrupt
 void hallTrigger() {
-  Serial.println("TRIGGER");
   total_gearTurns++;
-  Serial.print("Total Gear Turns:"); Serial.println(total_gearTurns);
-
   //code to increment rotation_gearTurns
   if (rotation_gearTurns < turnsPerRotation) {
     rotation_gearTurns++;
@@ -71,17 +78,16 @@ void hallTrigger() {
   else {
     rotation_gearTurns = 1; //at first glance it seems this should be zero. It shouldn't.
   }
-
-  Serial.print("Rotation Gear Turns:"); Serial.println(rotation_gearTurns);
 }
 
 void motor_cw() {
-  //Since I wanted to use the piezo speaker, I disabled the motor PWM.
+  //Swap the lines here if your motor pin is not PWM-capable.
   analogWrite(motor_cw_pin, normal_motor_speed);
   //digitalWrite(motor_cw_pin, HIGH);
 }
 
 void motor_ccw() {
+  //Swap these lines if your motor pin is not PWM-capable.
   analogWrite(motor_ccw_pin, normal_motor_speed);
   //digitalWrite(motor_ccw_pin, HIGH);
 }
@@ -150,15 +156,33 @@ void rotate(int track, int mode) {
   }
   if (mode == 1) {
     //forced clockwise
-    
+    if ((track - currentPosition) < 0) {
+       //if we cross over zero in order to get that
+       movesNeeded = (track + num_tracks) - currentPosition;
+       turn_cw(movesNeeded);
+    }
+    else {
+        //if we don't have to cross zero
+        movesNeeded = track - currentPosition;
+        turn_cw(movesNeeded);
+      }
   }
   if (mode == 2) {
     //forced counterclockwise
-    
+    if ((currentPosition - track) < 0) {
+        //if we cross over zero in order to get that
+        movesNeeded = (currentPosition + num_tracks) - track;
+        turn_ccw(movesNeeded);
+      }
+      else {
+        //if we don't have to cross zero
+        movesNeeded = currentPosition - track;
+        turn_ccw(movesNeeded);
+      }
   }
   if (mode == 3) {
-    //rotate 180
-    
+    //rotate 180 degrees
+    turn_cw((num_tracks/2));
   }
   Serial.print("Moves needed: "); Serial.println(movesNeeded);
   currentPosition = track;
