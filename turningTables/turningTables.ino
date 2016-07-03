@@ -7,6 +7,10 @@ turningTables | Model Railway Turntable Indexing System
 Author: k4kfh
 Project Website: https://github.com/k4kfh/turningTables
 */
+#include <CMRI.h>
+
+CMRI cmri;
+
 #define num_tracks 24
 #define motor_cw_pin 11
 #define motor_ccw_pin 10
@@ -37,7 +41,7 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(hall_pin), hallTrigger, FALLING);
 
   //start Serial connection
-  Serial.begin(9600);
+  Serial.begin(9600, SERIAL_8N2);
 
   //play startup noise
   startup_beep();
@@ -66,6 +70,13 @@ void loop() {
   lastButtonState_ccw = buttonState_ccw;
   //end button handling code
   // C/MRI Interface Code
+
+  // 1: main processing node of cmri library
+  cmri.process();
+
+  if (cmri.get_byte(0) == HIGH) {
+    //haven't gotten anywhere on this yet
+  }
 }
 
 //simple function to run on hall effect sensor interrupt
