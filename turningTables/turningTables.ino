@@ -8,8 +8,7 @@ Author: k4kfh
 Project Website: https://github.com/k4kfh/turningTables
 */
 #include <CMRI.h>
-
-CMRI cmri;
+#include <EEPROM.h>
 
 #define num_tracks 24
 #define motor_cw_pin 11
@@ -28,6 +27,7 @@ int buttonState_cw = 0;
 int lastButtonState_cw = 0;
 int buttonState_ccw = 0;
 int lastButtonState_ccw = 0;
+int mode = 0;
 
 void setup() {
   //set all the pins to the correct mode
@@ -37,18 +37,18 @@ void setup() {
   pinMode(service_btn_cw_pin, INPUT_PULLUP);
   pinMode(service_btn_ccw_pin, INPUT_PULLUP);
 
+  //read EEPROM for last position
+  //EEPROM.get(0, currentPosition);
+
   //making hall effect sensor interrupt
   attachInterrupt(digitalPinToInterrupt(hall_pin), hallTrigger, FALLING);
 
   //start Serial connection
   Serial.begin(9600, SERIAL_8N2);
 
+  //set "moving" light to off
   //play startup noise
   startup_beep();
-
-  //test code
-  rotate(5,0);
-  prepToShutdown();
 }
 
 void loop() {
@@ -69,14 +69,12 @@ void loop() {
   }
   lastButtonState_ccw = buttonState_ccw;
   //end button handling code
-  // C/MRI Interface Code
 
-  // 1: main processing node of cmri library
-  cmri.process();
-
-  if (cmri.get_byte(0) == HIGH) {
-    //haven't gotten anywhere on this yet
-  }
+  turn_cw(3);
+  delay(2000);
+  turn_ccw(3);
+  delay(2000);
+ 
 }
 
 //simple function to run on hall effect sensor interrupt
@@ -195,7 +193,11 @@ void rotate(int track, int mode) {
     //rotate 180 degrees
     turn_cw((num_tracks/2));
   }
-  Serial.print("Moves needed: "); Serial.println(movesNeeded);
+
+  //if we actually moved, write the current position to EEPROM
+  if (currentPosition != track){
+    //EEPROM.put(0,track);
+  }
   currentPosition = track;
 }
 
