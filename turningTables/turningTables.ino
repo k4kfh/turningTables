@@ -39,7 +39,7 @@ void setup() {
   pinMode(service_btn_ccw_pin, INPUT_PULLUP);
 
   //read EEPROM for last position
-  //EEPROM.get(0, currentPosition);
+  EEPROM.get(0, currentPosition);
 
   //making hall effect sensor interrupt
   attachInterrupt(digitalPinToInterrupt(hall_pin), hallTrigger, FALLING);
@@ -197,10 +197,7 @@ void rotate(int track, int mode) {
     turn_cw((num_tracks/2));
   }
 
-  //if we actually moved, write the current position to EEPROM
-  if (currentPosition != track){
-    //EEPROM.put(0,track);
-  }
+  EEPROM.put(0, track); //writes the current position to the EEPROM. This means that the Arduino will know where it is even if the power is cut ungracefully
   currentPosition = track;
 }
 
