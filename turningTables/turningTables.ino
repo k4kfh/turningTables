@@ -28,6 +28,7 @@ int lastButtonState_cw = 0;
 int buttonState_ccw = 0;
 int lastButtonState_ccw = 0;
 int mode = 0;
+int motorStartMillis = 0; //used in the time-based reliability enhancements
 
 void setup() {
   //set all the pins to the correct mode
@@ -70,22 +71,29 @@ void loop() {
   lastButtonState_ccw = buttonState_ccw;
   //end button handling code
 
-  turn_cw(3);
-  delay(2000);
-  turn_ccw(3);
-  delay(2000);
- 
+  //CMRI interface code
 }
 
 //simple function to run on hall effect sensor interrupt
 void hallTrigger() {
-  total_gearTurns++;
-  //code to increment rotation_gearTurns
-  if (rotation_gearTurns < turnsPerRotation) {
-    rotation_gearTurns++;
+  int currentMillis = millis();
+  int timeSinceStart = currentMillis - motorStartMillis;
+  Serial.print("motorStartMillis:");
+  Serial.print("Time Since Motor Start: ");
+  Serial.println(timeSinceStart);
+  if (timeSinceStart > 400) {
+    total_gearTurns++;
+    //code to increment rotation_gearTurns
+    if (rotation_gearTurns < turnsPerRotation) {
+      rotation_gearTurns++;
+    }
+    else {
+      rotation_gearTurns = 1; //at first glance it seems this should be zero. It shouldn't.
+    }
+    Serial.println("TRIGGER");
   }
   else {
-    rotation_gearTurns = 1; //at first glance it seems this should be zero. It shouldn't.
+    Serial.println("IGNORING TRIGGER DUE TO TOO-SOON TIMING");
   }
 }
 
@@ -108,6 +116,7 @@ void motor_stop() {
 
 //Turns the turntable clockwise by moves number of tracks
 void turn_cw(int moves) {
+  motorStartMillis = millis();
   for (int i=0; i < moves; i++) {
     //Turns the motor until the gear has rotated turnsPerRotation
     while (rotation_gearTurns < turnsPerRotation) {
@@ -120,6 +129,7 @@ void turn_cw(int moves) {
 
 //Turns the turntable counterclockwise by moves number of tracks
 void turn_ccw(int moves) {
+  motorStartMillis = millis();
   for (int i=0; i < moves; i++) {
     //Turns the motor until the gear has rotated turnsPerRotation
     while (rotation_gearTurns < turnsPerRotation) {
@@ -266,6 +276,7 @@ int chooseDirection(int currentPosition, int goingTo, int maxPosition) {
 
 //calibration and debug functions
 void click_cw() {
+  motorStartMillis = millis();
   for (int i=0; i < 1; i++) {
     //Turns the motor until the gear has rotated turnsPerRotation
     while (rotation_gearTurns < 1) {
@@ -277,6 +288,7 @@ void click_cw() {
 }
 
 void click_ccw() {
+  motorStartMillis = millis();
   for (int i=0; i < 1; i++) {
     //Turns the motor until the gear has rotated turnsPerRotation
     while (rotation_gearTurns < 1) {
