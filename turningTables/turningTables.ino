@@ -78,9 +78,6 @@ void loop() {
 void hallTrigger() {
   int currentMillis = millis();
   int timeSinceStart = currentMillis - motorStartMillis;
-  Serial.print("motorStartMillis:");
-  Serial.print("Time Since Motor Start: ");
-  Serial.println(timeSinceStart);
   if (timeSinceStart > 400) {
     total_gearTurns++;
     //code to increment rotation_gearTurns
@@ -90,10 +87,6 @@ void hallTrigger() {
     else {
       rotation_gearTurns = 1; //at first glance it seems this should be zero. It shouldn't.
     }
-    Serial.println("TRIGGER");
-  }
-  else {
-    Serial.println("IGNORING TRIGGER DUE TO TOO-SOON TIMING");
   }
 }
 
