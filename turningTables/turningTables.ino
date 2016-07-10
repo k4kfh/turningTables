@@ -29,6 +29,10 @@ int buttonState_ccw = 0;
 int lastButtonState_ccw = 0;
 int mode = 0;
 int motorStartMillis = 0; //used in the time-based reliability enhancements
+int lastBitStates[48];
+
+//setting up CMRI class
+CMRI cmri;
 
 void setup() {
   //set all the pins to the correct mode
@@ -47,9 +51,13 @@ void setup() {
   //start Serial connection
   Serial.begin(9600, SERIAL_8N2);
 
-  //set "moving" light to off
+  //set last bit states initially
+  for (int i=0;i < 47;i++) {
+    lastBitStates[i] = cmri.get_bit(i);
+  }
+
   //play startup noise
-  startup_beep();
+  startup_beep(); startup_beep();
 }
 
 void loop() {
@@ -72,6 +80,28 @@ void loop() {
   //end button handling code
 
   //CMRI interface code
+  cmri.process();
+
+  //all the bits for the stalls
+  for (int i=0; i < num_tracks; i++) {
+    int currentBit = cmri.get_bit(i);
+    if (currentBit == 1) {
+      if (currentBit != lastBitStates[i]) {
+        rotate(i,0);
+      }
+    }
+  }
+
+  if (cmri.get_bit(25) == 1) {
+    if (cmri.get_bit(25) != lastBitStates[25]) {
+      turn_ccw(12);
+    }
+  }
+
+  //set last bit states at the end of the "cycle"
+  for (int i=0;i < 47;i++) {
+    lastBitStates[i] = cmri.get_bit(i);
+  }
 }
 
 //simple function to run on hall effect sensor interrupt
