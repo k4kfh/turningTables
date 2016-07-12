@@ -20,8 +20,7 @@ Project Website: https://github.com/k4kfh/turningTables
 const int turnsPerRotation = 5; //this is 5 on Atlas turntable
 #define normal_motor_speed 255 //this is the PWM number the motor will turn at, if on a PWM-capable pin
 
-unsigned total_gearTurns = 0;
-int rotation_gearTurns = 0; //this will be between 1 and 5 always
+unsigned long targetGearTurns = 0; //subtract from this as we move until it's zero
 int currentPosition = 0;
 int buttonState_cw = 0;
 int lastButtonState_cw = 0;
@@ -97,6 +96,18 @@ void loop() {
       turn_ccw(12);
     }
   }
+  
+  if (targetGearTurns > 0) {
+    //if we're supposed to turn clockwise
+    motor_cw();
+  }
+  else if (targetGearTurns < 0) {
+    //if we're supposed to turn counterclockwise
+    motor_ccw();
+  }
+  else {
+    motor_stop();
+  }
 
   //set last bit states at the end of the "cycle"
   for (int i=0;i < 47;i++) {
@@ -109,13 +120,14 @@ void hallTrigger() {
   int currentMillis = millis();
   int timeSinceStart = currentMillis - motorStartMillis;
   if (timeSinceStart > 400) {
-    total_gearTurns++;
-    //code to increment rotation_gearTurns
-    if (rotation_gearTurns < turnsPerRotation) {
-      rotation_gearTurns++;
+    //if it's a valid sensor trigger based on timing
+    if (targetGearTurns > 0) {
+      //if we're turning clockwise, subtract to get closer to 0
+      targetGearTurns--;
     }
-    else {
-      rotation_gearTurns = 1; //at first glance it seems this should be zero. It shouldn't.
+    else if (targetGearTurns < 0) {
+      //if we're turning counterclockwise, add to get closer to zero (since the target value will be a negative number)
+      targetGearTurns++;
     }
   }
 }
@@ -139,28 +151,12 @@ void motor_stop() {
 
 //Turns the turntable clockwise by moves number of tracks
 void turn_cw(int moves) {
-  motorStartMillis = millis();
-  for (int i=0; i < moves; i++) {
-    //Turns the motor until the gear has rotated turnsPerRotation
-    while (rotation_gearTurns < turnsPerRotation) {
-      motor_cw();
-    }
-    rotation_gearTurns = 0; //this seems out of place, but it must be set otherwise the above WHILE loop can only run once
-  }
-  motor_stop();
+  targetGearTurns = moves * turnsPerRotation;
 }
 
 //Turns the turntable counterclockwise by moves number of tracks
 void turn_ccw(int moves) {
-  motorStartMillis = millis();
-  for (int i=0; i < moves; i++) {
-    //Turns the motor until the gear has rotated turnsPerRotation
-    while (rotation_gearTurns < turnsPerRotation) {
-      motor_ccw();
-    }
-    rotation_gearTurns = 0; //this seems out of place, but it must be set otherwise the above WHILE loop can only run once
-  }
-  motor_stop();
+  targetGearTurns = -1 * (moves * turnsPerRotation);
 }
 
 
@@ -296,27 +292,11 @@ int chooseDirection(int currentPosition, int goingTo, int maxPosition) {
 
 //calibration and debug functions
 void click_cw() {
-  motorStartMillis = millis();
-  for (int i=0; i < 1; i++) {
-    //Turns the motor until the gear has rotated turnsPerRotation
-    while (rotation_gearTurns < 1) {
-      motor_cw();
-    }
-    rotation_gearTurns = 0; //this seems out of place, but it must be set otherwise the above WHILE loop can only run once
-  }
-  motor_stop();
+  targetGearTurns++;
 }
 
 void click_ccw() {
-  motorStartMillis = millis();
-  for (int i=0; i < 1; i++) {
-    //Turns the motor until the gear has rotated turnsPerRotation
-    while (rotation_gearTurns < 1) {
-      motor_ccw();
-    }
-    rotation_gearTurns = 0; //this seems out of place, but it must be set otherwise the above WHILE loop can only run once
-  }
-  motor_stop();
+  targetGearTurns--;
 }
 
 void startup_beep() {
