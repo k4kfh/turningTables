@@ -1,16 +1,17 @@
 /*
-turningTables | Model Railway Turntable Indexing System
-- Compatible with Atlas and other turntable brands
-- Interfaces with JMRI by posing as a C/MRI system
-- C/MRI Interface courtesy of ArduinoCMRI library
-- Controlled as a series of turnouts, like a Walthers or other comparable turntable
-Author: k4kfh
-Project Website: https://github.com/k4kfh/turningTables
+  turningTables | Model Railway Turntable Indexing System
+  - Compatible with Atlas and other turntable brands
+  - Interfaces with JMRI by posing as a C/MRI system
+  - C/MRI Interface courtesy of ArduinoCMRI library
+  - Controlled as a series of turnouts, like a Walthers or other comparable turntable
+  Author: k4kfh
+  Project Website: https://github.com/k4kfh/turningTables
 */
 #include <CMRI.h>
 #include <EEPROM.h>
 
-#define num_tracks 24
+const int num_tracks = 24;
+const int halfRotation = 12;
 #define motor_cw_pin 11
 #define motor_ccw_pin 10
 #define piezo_pin 9
@@ -18,10 +19,10 @@ Project Website: https://github.com/k4kfh/turningTables
 #define service_btn_ccw_pin 4
 #define hall_pin 2 //make sure this pin is interrupt-capable
 const int turnsPerRotation = 5; //this is 5 on Atlas turntable
-#define normal_motor_speed 255 //this is the PWM number the motor will turn at, if on a PWM-capable pin
 
-unsigned long targetGearTurns = 0; //subtract from this as we move until it's zero
+int targetGearTurns = 0; //subtract from this as we move until it's zero
 int currentPosition = 0;
+int targetPosition = 0;
 int buttonState_cw = 0;
 int lastButtonState_cw = 0;
 int buttonState_ccw = 0;
@@ -51,12 +52,12 @@ void setup() {
   Serial.begin(9600, SERIAL_8N2);
 
   //set last bit states initially
-  for (int i=0;i < 47;i++) {
+  for (int i = 0; i < 47; i++) {
     lastBitStates[i] = cmri.get_bit(i);
   }
 
   //play startup noise
-  startup_beep(); startup_beep();
+  startup_beep();
 }
 
 void loop() {
@@ -78,25 +79,29 @@ void loop() {
   lastButtonState_ccw = buttonState_ccw;
   //end button handling code
 
+
   //CMRI interface code
   cmri.process();
 
-  //all the bits for the stalls
-  for (int i=0; i < num_tracks; i++) {
+  //all the bits for the stalls - if targetGearTurns is not zero, this shouldn't run!!!
+  for (int i = 0; i < num_tracks; i++) {
     int currentBit = cmri.get_bit(i);
     if (currentBit == 1) {
       if (currentBit != lastBitStates[i]) {
-        rotate(i,0);
+        rotate(i, 0);
       }
     }
   }
 
   if (cmri.get_bit(25) == 1) {
-    if (cmri.get_bit(25) != lastBitStates[25]) {
-      turn_ccw(12);
+    if (lastBitStates[25] != 1) {
+      if (targetGearTurns == 0) {
+        targetGearTurns = 60;
+      }
     }
   }
-  
+  //end main CMRI iface code (aside from lastBitStates at the end of loop() )
+
   if (targetGearTurns > 0) {
     //if we're supposed to turn clockwise
     motor_cw();
@@ -109,10 +114,24 @@ void loop() {
     motor_stop();
   }
 
+/*
+  if (targetGearTurns == 0) {
+    //if we're not moving
+
+    //set all the stall bits to zero first
+    for (int i = 0; i < 24; i++) {
+      cmri.set_bit(i, LOW);
+    }
+    //now set the current sensor bit HIGH so JMRI knows where it is
+    cmri.set_bit(currentPosition, HIGH);
+  }
+  */
+
   //set last bit states at the end of the "cycle"
-  for (int i=0;i < 47;i++) {
+  for (int i = 0; i < 47; i++) {
     lastBitStates[i] = cmri.get_bit(i);
   }
+
 }
 
 //simple function to run on hall effect sensor interrupt
@@ -124,24 +143,34 @@ void hallTrigger() {
     if (targetGearTurns > 0) {
       //if we're turning clockwise, subtract to get closer to 0
       targetGearTurns--;
+      if (targetGearTurns == 0) {
+        //if that was the last turn, set the position to the new value
+        currentPosition = targetPosition;
+      }
     }
     else if (targetGearTurns < 0) {
       //if we're turning counterclockwise, add to get closer to zero (since the target value will be a negative number)
       targetGearTurns++;
+      if (targetGearTurns == 0) {
+        //if that was the last turn, set the position to the new value
+        currentPosition = targetPosition;
+      }
     }
   }
 }
 
 void motor_cw() {
-  //Swap the lines here if your motor pin is not PWM-capable.
-  analogWrite(motor_cw_pin, normal_motor_speed);
-  //digitalWrite(motor_cw_pin, HIGH);
+  if (digitalRead(motor_cw_pin) == LOW) {
+    motorStartMillis = millis();
+  }
+  digitalWrite(motor_cw_pin, HIGH);
 }
 
 void motor_ccw() {
-  //Swap these lines if your motor pin is not PWM-capable.
-  analogWrite(motor_ccw_pin, normal_motor_speed);
-  //digitalWrite(motor_ccw_pin, HIGH);
+  if (digitalRead(motor_ccw_pin) == LOW) {
+    motorStartMillis = millis();
+  }
+  digitalWrite(motor_ccw_pin, HIGH);
 }
 
 void motor_stop() {
@@ -162,11 +191,39 @@ void turn_ccw(int moves) {
 
 //Rotates the turntable to TRACK in MODE (mode can be 0, 1, 2, or 3, for auto-direction, clockwise, counterclockwise, or forced 180)
 void rotate(int track, int mode) {
-  int movesNeeded;
-  if (mode == 0) {
-    //automatic direction choice
-    int actualDirection = chooseDirection(currentPosition, track, num_tracks);
-    if (actualDirection == 1) {
+  if (targetGearTurns == 0) {
+    int movesNeeded;
+    if (mode == 0) {
+      //automatic direction choice
+      int actualDirection = chooseDirection(currentPosition, track, num_tracks);
+      if (actualDirection == 1) {
+        if ((track - currentPosition) < 0) {
+          //if we cross over zero in order to get that
+          movesNeeded = (track + num_tracks) - currentPosition;
+          turn_cw(movesNeeded);
+        }
+        else {
+          //if we don't have to cross zero
+          movesNeeded = track - currentPosition;
+          turn_cw(movesNeeded);
+        }
+      }
+      else if (actualDirection == 2) {
+        //counterclockwise
+        if ((currentPosition - track) < 0) {
+          //if we cross over zero in order to get that
+          movesNeeded = (currentPosition + num_tracks) - track;
+          turn_ccw(movesNeeded);
+        }
+        else {
+          //if we don't have to cross zero
+          movesNeeded = currentPosition - track;
+          turn_ccw(movesNeeded);
+        }
+      }
+    }
+    if (mode == 1) {
+      //forced clockwise
       if ((track - currentPosition) < 0) {
         //if we cross over zero in order to get that
         movesNeeded = (track + num_tracks) - currentPosition;
@@ -178,8 +235,8 @@ void rotate(int track, int mode) {
         turn_cw(movesNeeded);
       }
     }
-    else if (actualDirection == 2) {
-      //counterclockwise
+    if (mode == 2) {
+      //forced counterclockwise
       if ((currentPosition - track) < 0) {
         //if we cross over zero in order to get that
         movesNeeded = (currentPosition + num_tracks) - track;
@@ -191,40 +248,14 @@ void rotate(int track, int mode) {
         turn_ccw(movesNeeded);
       }
     }
-  }
-  if (mode == 1) {
-    //forced clockwise
-    if ((track - currentPosition) < 0) {
-       //if we cross over zero in order to get that
-       movesNeeded = (track + num_tracks) - currentPosition;
-       turn_cw(movesNeeded);
+    if (mode == 3) {
+      //rotate 180 degrees
+      turn_cw(halfRotation);
     }
-    else {
-        //if we don't have to cross zero
-        movesNeeded = track - currentPosition;
-        turn_cw(movesNeeded);
-      }
-  }
-  if (mode == 2) {
-    //forced counterclockwise
-    if ((currentPosition - track) < 0) {
-        //if we cross over zero in order to get that
-        movesNeeded = (currentPosition + num_tracks) - track;
-        turn_ccw(movesNeeded);
-      }
-      else {
-        //if we don't have to cross zero
-        movesNeeded = currentPosition - track;
-        turn_ccw(movesNeeded);
-      }
-  }
-  if (mode == 3) {
-    //rotate 180 degrees
-    turn_cw((num_tracks/2));
-  }
 
-  EEPROM.put(0, track); //writes the current position to the EEPROM. This means that the Arduino will know where it is even if the power is cut ungracefully
-  currentPosition = track;
+    EEPROM.put(0, track); //writes the current position to the EEPROM. This means that the Arduino will know where it is even if the power is cut ungracefully
+    targetPosition = track;
+  }
 }
 
 
@@ -232,31 +263,31 @@ void rotate(int track, int mode) {
 int chooseDirection(int currentPosition, int goingTo, int maxPosition) {
   int directionToGo; //this will be defined later, just go ahead and declare it
   int specialNum = maxPosition / 2;
-  if(currentPosition < goingTo) {
-    if(abs(currentPosition - goingTo) < specialNum) {
-       //CLOCKWISE
-       directionToGo = 1;
+  if (currentPosition < goingTo) {
+    if (abs(currentPosition - goingTo) < specialNum) {
+      //CLOCKWISE
+      directionToGo = 1;
     }
     else {
-        //COUNTERCLOCKWISE
-        directionToGo = 2;
+      //COUNTERCLOCKWISE
+      directionToGo = 2;
     }
   }
 
   else {
-    if(abs(currentPosition - goingTo) < specialNum) {
-       //COUNTERCLOCKWISE
-       directionToGo = 2;
+    if (abs(currentPosition - goingTo) < specialNum) {
+      //COUNTERCLOCKWISE
+      directionToGo = 2;
     }
     else {
-        //CLOCKWISE
-        directionToGo = 1;
+      //CLOCKWISE
+      directionToGo = 1;
     }
   }
   return directionToGo;
- }
+}
 
- void prepToShutdown() {
+void prepToShutdown() {
   tone(piezo_pin, 500);
   delay(200);
   noTone(piezo_pin);
@@ -269,7 +300,7 @@ int chooseDirection(int currentPosition, int goingTo, int maxPosition) {
   delay(200);
   noTone(piezo_pin);
   delay(200);
-  rotate(0,0);
+  rotate(0, 0);
   delay(2000);
   tone(piezo_pin, 800);
   delay(75);
@@ -288,15 +319,15 @@ int chooseDirection(int currentPosition, int goingTo, int maxPosition) {
   tone(piezo_pin, 100);
   delay(100);
   noTone(piezo_pin);
- }
+}
 
 //calibration and debug functions
 void click_cw() {
-  targetGearTurns++;
+  targetGearTurns = 1;
 }
 
 void click_ccw() {
-  targetGearTurns--;
+  targetGearTurns = -1;
 }
 
 void startup_beep() {
