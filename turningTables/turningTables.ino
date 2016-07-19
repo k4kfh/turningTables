@@ -10,15 +10,17 @@
 #include <CMRI.h>
 #include <EEPROM.h>
 
-const int num_tracks = 24;
-const int halfRotation = 12;
+//USER CONFIGURATION (FOR ARDUINO PINS)
 #define motor_cw_pin 11
 #define motor_ccw_pin 10
 #define piezo_pin 9
 #define service_btn_cw_pin 3
 #define service_btn_ccw_pin 4
 #define hall_pin 2 //make sure this pin is interrupt-capable
+
+//defining constants
 const int turnsPerRotation = 5; //this is 5 on Atlas turntable
+const int num_tracks = 24;
 
 int targetGearTurns = 0; //subtract from this as we move until it's zero
 int currentPosition = 0;
