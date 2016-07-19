@@ -25,6 +25,7 @@ The magnet should be mounted to the gear that engages directly with the motor un
 ### Parts List
 
 - Arduino Uno
+  - ![](http://arduino.cc/en/uploads/Main/ArduinoUno_R3_Front_450px.jpg)
 - 3 0.1uF ceramic capacitors
 - Misc. Small Wire (20-22ga)
 - 12v H-Bridge board or Arduino Motor Shield
